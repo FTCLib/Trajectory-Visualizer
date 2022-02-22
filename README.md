@@ -1,14 +1,15 @@
 
 # FTCLib Trajectory Visualizer
 
-
-
+![Trajectory Visualizer Sample](/images/readme/screencap.gif?raw=true)
 
 ## Requirements
 
 [Intellij](https://www.jetbrains.com/idea/download/#section=windows)
 
 [Java 17.0.1](https://www.oracle.com/java/technologies/javase/jdk17-archive-downloads.html)
+
+[JavaFX 17.0.1](https://mvnrepository.com/artifact/org.openjfx/javafx/17.0.1)
 
   
 ## Running the Program

@@ -84,7 +84,7 @@ public class VisualizerController {
         fileChooser.setInitialFileName("trajectory");
         fileChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("poggers", "*.pog"));
         exportChooser = new FileChooser();
-        exportChooser.setInitialFileName("trajectory");
+        exportChooser.setInitialFileName("Trajectory");
         exportChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Java", "*.java"));
 
         endRect = new Rectangle(robotHeight.get(), robotWidth.get());
@@ -213,7 +213,7 @@ public class VisualizerController {
 
     @FXML
     protected void onFieldClick() {
-        if (isTrajCreated == false)
+        if (!isTrajCreated)
             return;
         System.out.println("Trajectory Time: " + trajectory().getTotalTimeSeconds());
         System.out.println("Cur Time: " + timeline.getCurrentTime());
@@ -249,7 +249,7 @@ public class VisualizerController {
 
     @FXML
     protected void onSaveClick() throws IOException {
-        if (isTrajCreated == false) {
+        if (!isTrajCreated) {
             Notifications.create()
                     .title("Save Error")
                     .text("Why would you save nothing?")
@@ -258,7 +258,6 @@ public class VisualizerController {
             return;
         }
         File saveFile = fileChooser.showSaveDialog(canvas.getScene().getWindow());
-        saveFile.setWritable(true);
         BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(saveFile));
         SaveManager saveManager = new SaveManager(saveFile);
         saveManager.writeMode(bufferedWriter);
@@ -272,7 +271,7 @@ public class VisualizerController {
 
     @FXML
     protected void onLoadClick() throws IOException {
-        if (isTrajCreated == false) {
+        if (!isTrajCreated) {
             Notifications.create()
                     .title("Load Error")
                     .text("Please click Create Trajectory before loading a new one :)")
@@ -319,7 +318,7 @@ public class VisualizerController {
 
     @FXML
     protected void javaExportClick() throws IOException {
-        if (isTrajCreated == false) {
+        if (!isTrajCreated) {
             Notifications.create()
                     .title("Export Error")
                     .text("What are you even exporting?")
@@ -328,11 +327,10 @@ public class VisualizerController {
             return;
         }
         File saveFile = exportChooser.showSaveDialog(canvas.getScene().getWindow());
-        saveFile.setWritable(true);
         FileWriter fileWriter = new FileWriter(saveFile);
         BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
-        bufferedWriter.write("public class VisualizerController {\n");
-        bufferedWriter.write("    public Trajectory trajectory() {\n" +
+        bufferedWriter.write("public class " + saveFile.getName().replaceAll(".java", "") + " {\n");
+        bufferedWriter.write("    public static Trajectory trajectory() {\n" +
                 "        Pose2d start = new Pose2d(" + startX.get() + ", " + startY.get() + ", new Rotation2d(Math.toRadians(" + startH.get() + ")));\n" +
                 "        Pose2d end = new Pose2d(" + endX.get() + ", " + endY.get() + ", new Rotation2d(Math.toRadians(" + endH.get() + ")));\n" +
                 "\n" +
@@ -370,6 +368,9 @@ public class VisualizerController {
         intWP.getChildren().add(new Label("Y"));
         intWP.getChildren().add(y);
         fieldPane.getChildren().add(1, waypoint);
+
+        x.textProperty().addListener((observable, oldValue, newValue) -> drawPath());
+        y.textProperty().addListener((observable, oldValue, newValue) -> drawPath());
         delBtn.setOnMouseClicked(mouseEvent -> {
             intWP.getChildren().remove(intWP.getChildren().indexOf(waypointBox), intWP.getChildren().indexOf(y) + 1);
             fieldPane.getChildren().remove(fieldPane.getChildren().indexOf(waypoint));
@@ -385,6 +386,7 @@ public class VisualizerController {
             }
             drawPath();
         });
+        drawPath();
     }
 
     public void manageConstraints() {

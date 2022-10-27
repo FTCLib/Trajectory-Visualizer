@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.canvas.Canvas?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Menu?>
+<?import javafx.scene.control.MenuBar?>
+<?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.StackPane?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox alignment="CENTER" prefHeight="600.0" prefWidth="630.0" spacing="20.0" xmlns="http://javafx.com/javafx/8.0.171" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.litehed.VisualizerController">
+    <padding>
+        <Insets bottom="20.0" />
+    </padding>
+    <MenuBar nodeOrientation="LEFT_TO_RIGHT">
+        <menus>
+            <Menu mnemonicParsing="false" text="File">
+                <items>
+                    <MenuItem mnemonicParsing="false" onAction="#onSaveClick" text="Save" />
+                    <MenuItem mnemonicParsing="false" onAction="#onLoadClick" text="Load" />
+               <MenuItem mnemonicParsing="false" onAction="#onReloadClick" text="Reload" />
+                </items>
+            </Menu>
+         <Menu mnemonicParsing="false" text="Export">
+            <items>
+               <MenuItem mnemonicParsing="false" onAction="#javaExportClick" text="Java" />
+            </items>
+         </Menu>
+        </menus>
+    </MenuBar>
+    <HBox prefHeight="332.0" prefWidth="451.0">
+        <children>
+            <StackPane id="field" fx:id="fieldPane" onMouseClicked="#onFieldClick" onMouseMoved="#onFieldMouseHover" prefHeight="150.0" prefWidth="200.0">
+                <children>
+                    <ImageView fx:id="background" fitHeight="450.0" fitWidth="450.0" pickOnBounds="true" preserveRatio="true">
+                        <image>
+                            <Image url="@field.png" />
+                        </image>
+                    </ImageView>
+                    <ImageView fx:id="robot" fitHeight="60.0" fitWidth="60.0" pickOnBounds="true" preserveRatio="true">
+                        <image>
+                            <Image url="@robot.png" />
+                        </image>
+                    </ImageView>
+                    <Label fx:id="coords" text="Coords: (0,0)" textAlignment="CENTER" translateY="20.0" StackPane.alignment="BOTTOM_RIGHT">
+                        <StackPane.margin>
+                            <Insets />
+                        </StackPane.margin>
+                    </Label>
+                    <Canvas fx:id="canvas" height="450.0" width="450.0" StackPane.alignment="CENTER" />
+                </children>
+            </StackPane>
+            <VBox fx:id="trajBox" alignment="CENTER" prefHeight="332.0" prefWidth="158.0">
+                <children>
+                    <Button fx:id="addTrajBtn" alignment="CENTER" contentDisplay="TOP" mnemonicParsing="false" onMouseClicked="#onTrajCreateClick" text="Create Trajectory" textAlignment="CENTER" />
+                </children>
+            </VBox>
+        </children>
+        <VBox.margin>
+            <Insets left="10.0" />
+        </VBox.margin>
+    </HBox>
+    <HBox fx:id="btnBox" prefHeight="100.0" prefWidth="200.0" />
+</VBox>

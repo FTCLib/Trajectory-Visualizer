@@ -11,20 +11,14 @@
 
 ## Requirements
 
-[IntelliJ IDEA](https://www.jetbrains.com/idea/download/)
-
-[Java 17.0.1](https://www.oracle.com/java/technologies/javase/jdk17-archive-downloads.html)
-
-[JavaFX 17.0.1](https://mvnrepository.com/artifact/org.openjfx/javafx/17.0.1)
+[VSCode](https://code.visualstudio.com/download)
 
 ## Installation
 
-1) Install [IntelliJ IDEA](https://www.jetbrains.com/idea/download/)
+1) Install [VSCode](https://code.visualstudio.com/download)
 2) Fork and clone this repository onto your local device
-3) Open your new project inside Intellij IDEA
-   - File > Open
-4) Run src/main/java/com/litehed/trajectoryvis/VisualizerApplication.java
-   - Click on the green play button on Line 11 (public class VisualizerApplication)
+3) Open your new project inside VSCode
+   - File > Open Folder...
 
 ## Usage
 

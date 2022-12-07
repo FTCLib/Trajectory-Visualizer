@@ -12,6 +12,7 @@ import javafx.animation.*;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleDoubleProperty;
+import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.canvas.Canvas;
@@ -114,19 +115,22 @@ public class VisualizerController {
         timeLabel.setTranslateX(12.0);
         timeLabel.setTranslateY(5.0);
 
-        progressBar.setOnMouseClicked(event -> {
-            double newProgress = event.getX() / progressBar.getWidth();
-            Duration newDuration = Duration.seconds(newProgress * trajectory().getTotalTimeSeconds());
-            time.set(newProgress);
-            timeline.playFrom(newDuration);
-            if(playType == PlayerBtn.RESUME) timeline.pause();
-            pathTransition.playFrom(newDuration);
-            if(playType == PlayerBtn.RESUME) pathTransition.pause();
-            rotateTransition.playFrom(newDuration);
-            if(playType == PlayerBtn.RESUME) rotateTransition.pause();
-            if(playType == PlayerBtn.PLAY) {
-                playType = PlayerBtn.RESUME;
-                playBtn.setGraphic(new Glyph("FontAwesome", "PAUSE"));
+        progressBar.addEventHandler(MouseEvent.MOUSE_DRAGGED, new EventHandler<MouseEvent>() {
+            @Override
+            public void handle(MouseEvent event) {
+                double newProgress = event.getX() / progressBar.getWidth();
+                Duration newDuration = Duration.seconds(newProgress * trajectory().getTotalTimeSeconds());
+                time.set(newProgress);
+                timeline.playFrom(newDuration);
+                if(playType == PlayerBtn.RESUME) timeline.pause();
+                pathTransition.playFrom(newDuration);
+                if(playType == PlayerBtn.RESUME) pathTransition.pause();
+                rotateTransition.playFrom(newDuration);
+                if(playType == PlayerBtn.RESUME) rotateTransition.pause();
+                if(playType == PlayerBtn.PLAY) {
+                    playType = PlayerBtn.RESUME;
+                    playBtn.setGraphic(new Glyph("FontAwesome", "PAUSE"));
+                }
             }
           });
           

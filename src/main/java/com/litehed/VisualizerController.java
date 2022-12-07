@@ -63,6 +63,7 @@ public class VisualizerController {
     private final ArrayList<Translation2d> interiorWaypoints = new ArrayList<>();
     private final Accordion trajEditor = new Accordion();
     private final PathTransition pathTransition;
+    private SequentialTransition rotateTransition;
     private SequentialTransition rotateList;
     private final VBox constr, startPos, intWP, endPos, robotBox;
     private final Rectangle endRect, startRect;
@@ -113,6 +114,22 @@ public class VisualizerController {
         timeLabel.setTranslateX(12.0);
         timeLabel.setTranslateY(5.0);
 
+        progressBar.setOnMouseClicked(event -> {
+            double newProgress = event.getX() / progressBar.getWidth();
+            Duration newDuration = Duration.seconds(newProgress * trajectory().getTotalTimeSeconds());
+            time.set(newProgress);
+            timeline.playFrom(newDuration);
+            if(playType == PlayerBtn.RESUME) timeline.pause();
+            pathTransition.playFrom(newDuration);
+            if(playType == PlayerBtn.RESUME) pathTransition.pause();
+            rotateTransition.playFrom(newDuration);
+            if(playType == PlayerBtn.RESUME) rotateTransition.pause();
+            if(playType == PlayerBtn.PLAY) {
+                playType = PlayerBtn.RESUME;
+                playBtn.setGraphic(new Glyph("FontAwesome", "PAUSE"));
+            }
+          });
+          
         trajEditor.getPanes().add(new TitledPane("Constraints", constr = new VBox(
                 new Label("Max Velocity m/s"), new NumberField("1.5"),
                 new Label("Max Acceleration m/s^2"), new NumberField("1.5"),
@@ -427,7 +444,7 @@ public class VisualizerController {
         return polyline;
     }
 
-    public void createAndPlayRotationList() {
+    public SequentialTransition createRotationList() {
         rotateList = new SequentialTransition();
         for (double sample = 0.01; sample < trajectory().getTotalTimeSeconds(); sample += 0.01) {
             RotateTransition tempTrans = new RotateTransition();
@@ -436,7 +453,7 @@ public class VisualizerController {
             tempTrans.setToAngle(-Math.toDegrees(trajectory().sample(sample).poseMeters.getHeading()));
             rotateList.getChildren().add(tempTrans);
         }
-        rotateList.play();
+        return rotateList;
     }
 
     public void handlePlay() {
@@ -458,8 +475,9 @@ public class VisualizerController {
                 pathTransition.setNode(robot);
                 pathTransition.setDuration(Duration.seconds(trajectory().getTotalTimeSeconds()));
                 pathTransition.setPath(drawPath());
+                rotateTransition = createRotationList();
                 pathTransition.play();
-                createAndPlayRotationList();
+                rotateTransition.play();
 
                 playType = PlayerBtn.PAUSE;
                 playBtn.setGraphic(new Glyph("FontAwesome", "PAUSE"));
@@ -467,6 +485,7 @@ public class VisualizerController {
                     playBtn.setGraphic(new Glyph("FontAwesome", "REPEAT"));
                     playType = PlayerBtn.PLAY;
                 });
+                break;
             }
             case PAUSE: {
                 pathTransition.pause();
@@ -475,6 +494,7 @@ public class VisualizerController {
                 System.out.println("Paused");
                 playType = PlayerBtn.RESUME;
                 playBtn.setGraphic(new Glyph("FontAwesome", "PLAY"));
+                break;
             }
             case RESUME: {
                 pathTransition.play();
@@ -483,6 +503,7 @@ public class VisualizerController {
                 System.out.println("Resumed");
                 playType = PlayerBtn.PAUSE;
                 playBtn.setGraphic(new Glyph("FontAwesome", "PAUSE"));
+                break;
             }
         }
     }

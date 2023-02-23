@@ -20,6 +20,16 @@
 3) Open your new project inside VSCode
    - File > Open Folder...
 
+## Running the Visualizer
+### Method 1
+You can run the following command from y9ur terminal in the Trajectory-Visualizer directory:
+
+``` & mvn javafx:run -f "pom.xml"```
+
+### Method 2
+In vscode you can find the maven tab under your explorer. Within that maven tab you can navigate to plugins, then javafx, and finally javafx:run
+```maven => trajectoryvis => plugins => javafx => javafx:run```
+
 ## Usage
 
 ### Trajectory Options

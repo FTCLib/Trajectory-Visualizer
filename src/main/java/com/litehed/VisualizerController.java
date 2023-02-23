@@ -12,7 +12,6 @@ import javafx.animation.*;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleDoubleProperty;
-import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.scene.Node;
 import javafx.scene.canvas.Canvas;
@@ -82,13 +81,9 @@ public class VisualizerController {
     private CheckBox reversed;
 
     public VisualizerController() {
-        fileChooser = new FileChooser();
-        fileChooser.setInitialFileName("trajectory");
-        fileChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("poggers", "*.pog"));
-        exportChooser = new FileChooser();
-        exportChooser.setInitialFileName("Trajectory");
-        exportChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Java", "*.java"));
-
+        initializeFileChoosers();
+        
+        // Create start and end path indicators
         endRect = new Rectangle(robotHeight.get(), robotWidth.get());
         startRect = new Rectangle(robotHeight.get(), robotWidth.get());
         endRect.widthProperty().bind(robotHeight);
@@ -97,16 +92,19 @@ public class VisualizerController {
         startRect.heightProperty().bind(robotWidth);
         endRect.setOpacity(0.3);
         startRect.setOpacity(0.3);
-
+        
+        // Create the waypoint and play buttons
         wayPointBtn = new Button("Add Waypoint");
         wayPointBtn.setOnMouseClicked(mouseEvent -> addWaypoint(0.0, 0.0));
 
         playBtn = new Button("", new Glyph("FontAwesome", "PLAY"));
 
+        // Initialize teh transitions to visualize robot movement
         pathTransition = new PathTransition();
         rotateList = new SequentialTransition();
         playBtn.setOnMouseClicked(mouseEvent -> handlePlay());
 
+        // Create progress bar to control and view where along the path the robot is
         progressBar = new ProgressBar();
         progressBar.progressProperty().bind(time);
         progressBar.setTranslateX(10.0);
@@ -115,25 +113,25 @@ public class VisualizerController {
         timeLabel.setTranslateX(12.0);
         timeLabel.setTranslateY(5.0);
 
-        progressBar.addEventHandler(MouseEvent.MOUSE_DRAGGED, new EventHandler<MouseEvent>() {
-            @Override
-            public void handle(MouseEvent event) {
-                double newProgress = event.getX() / progressBar.getWidth();
-                Duration newDuration = Duration.seconds(newProgress * trajectory().getTotalTimeSeconds());
-                time.set(newProgress);
-                timeline.playFrom(newDuration);
-                if(playType == PlayerBtn.RESUME) timeline.pause();
-                pathTransition.playFrom(newDuration);
-                if(playType == PlayerBtn.RESUME) pathTransition.pause();
-                rotateTransition.playFrom(newDuration);
-                if(playType == PlayerBtn.RESUME) rotateTransition.pause();
-                if(playType == PlayerBtn.PLAY) {
-                    playType = PlayerBtn.RESUME;
-                    playBtn.setGraphic(new Glyph("FontAwesome", "PAUSE"));
-                }
+        progressBar.addEventHandler(MouseEvent.MOUSE_DRAGGED, event -> {
+            double newProgress = event.getX() / progressBar.getWidth();
+            Duration newDuration = Duration.seconds(newProgress * trajectory().getTotalTimeSeconds());
+            time.set(newProgress);
+            timeline.playFrom(newDuration);
+            if(playType == PlayerBtn.RESUME) timeline.pause();
+            pathTransition.playFrom(newDuration);
+            if(playType == PlayerBtn.RESUME) pathTransition.pause();
+            rotateTransition.playFrom(newDuration);
+            if(playType == PlayerBtn.RESUME) rotateTransition.pause();
+            if(playType == PlayerBtn.PLAY) {
+                playType = PlayerBtn.RESUME;
+                playBtn.setGraphic(new Glyph("FontAwesome", "PAUSE"));
             }
+            
           });
           
+
+        // Create the trajectory editor panel
         trajEditor.getPanes().add(new TitledPane("Constraints", constr = new VBox(
                 new Label("Max Velocity m/s"), new NumberField("1.5"),
                 new Label("Max Acceleration m/s^2"), new NumberField("1.5"),
@@ -157,8 +155,8 @@ public class VisualizerController {
         )));
 
         trajEditor.getPanes().add(new TitledPane("Robot", robotBox = new VBox(
-                new Label("Length"), new NumberField("18.0"),
-                new Label("Width"), new NumberField("18.0")
+                new Label("Length (in)"), new NumberField("18.0"),
+                new Label("Width (in)"), new NumberField("18.0")
         )));
 
         for (int i = 1; i < startPos.getChildren().size(); i += 2) {
@@ -195,12 +193,13 @@ public class VisualizerController {
             });
         }
 
-        startRect.translateYProperty().bind(startX.multiply(-125.64918746859));
-        startRect.translateXProperty().bind(startY.multiply(-125.64918746859));
+        // Bind conversions  
+        startRect.translateYProperty().bind(startX.multiply(-Constants.PIXELS_PER_METER));
+        startRect.translateXProperty().bind(startY.multiply(-Constants.PIXELS_PER_METER));
         startRect.rotateProperty().bind(startH.multiply(-1.0));
 
-        endRect.translateYProperty().bind(endX.multiply(-125.64918746859));
-        endRect.translateXProperty().bind(endY.multiply(-125.64918746859));
+        endRect.translateYProperty().bind(endX.multiply(-Constants.PIXELS_PER_METER));
+        endRect.translateXProperty().bind(endY.multiply(-Constants.PIXELS_PER_METER));
         endRect.rotateProperty().bind(endH.multiply(-1.0));
 
         NumberField widthField = (NumberField) robotBox.getChildren().get(1);
@@ -218,6 +217,18 @@ public class VisualizerController {
 
         wpScroll.setFitToWidth(true);
         manageConstraints();
+    }
+
+    private void initializeFileChoosers() {
+        fileChooser = new FileChooser();
+        fileChooser.setInitialFileName("trajectory");
+        fileChooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("poggers", "*.pog"));
+    
+        exportChooser = new FileChooser();
+        exportChooser.setInitialFileName("Trajectory");
+        exportChooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("Java", "*.java"));
     }
 
     public Trajectory trajectory() {

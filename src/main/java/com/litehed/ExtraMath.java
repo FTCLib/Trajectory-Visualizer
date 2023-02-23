@@ -9,8 +9,8 @@ public final class ExtraMath {
     }
 
     public static double clampNumField(NumberField numField, double amnt) {
-        if (amnt > 1.7907 || amnt < -1.7907) {
-            double num = (amnt < 0) ? -1.7907 : 1.7907;
+        if (amnt > Constants.MAX_FIELD_METERS || amnt < Constants.MIN_FIELD_METERS) {
+            double num = (amnt < 0) ? Constants.MIN_FIELD_METERS : Constants.MAX_FIELD_METERS;
             numField.setText("" + num);
             return num;
         }
@@ -18,11 +18,11 @@ public final class ExtraMath {
     }
 
     public static double metersToUnits(double meters) {
-        return -125.64918746859 * meters;
+        return -Constants.PIXELS_PER_METER * meters;
     }
 
     public static double unitsToMeters(double units) {
-        return -0.0079586666666667 * units;
+        return -Constants.METERS_PER_PIXEL * units;
     }
 
     public static double robotConv(double size) {

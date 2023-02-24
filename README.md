@@ -30,6 +30,9 @@ You can run the following command from y9ur terminal in the Trajectory-Visualize
 In vscode you can find the maven tab under your explorer. Within that maven tab you can navigate to plugins, then javafx, and finally javafx:run
 ```maven => trajectoryvis => plugins => javafx => javafx:run```
 
+### Method 3
+In vscode, navigate to the App.java file. Attached to the main method there should be a run button. If you click that the program will run.
+
 ## Usage
 
 ### Trajectory Options

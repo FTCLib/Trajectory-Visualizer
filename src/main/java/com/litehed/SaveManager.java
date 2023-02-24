@@ -46,10 +46,12 @@ public class SaveManager {
 
     public void syncBools(CheckBox... checkBox) {
         System.out.println(scan.nextLine());
+        
         int numFieldValue = 0;
-        while (scan.hasNextDouble()) {
+        while (scan.hasNextBoolean()) {
             boolean temp = scan.nextBoolean();
             checkBox[numFieldValue].selectedProperty().set(temp);
+            System.out.println("CheckBox Value: " + checkBox[numFieldValue].selectedProperty().get());
             numFieldValue++;
         }
     }

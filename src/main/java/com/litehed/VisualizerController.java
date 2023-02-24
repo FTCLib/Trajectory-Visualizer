@@ -1,13 +1,10 @@
 package com.litehed;
 
 import com.litehed.extraControls.NumberField;
+import com.litehed.extraControls.TrajectoryPane;
 import com.litehed.extraControls.Waypoint;
-import com.litehed.ftclib.geometry.Pose2d;
-import com.litehed.ftclib.geometry.Rotation2d;
 import com.litehed.ftclib.geometry.Translation2d;
 import com.litehed.ftclib.trajectory.Trajectory;
-import com.litehed.ftclib.trajectory.TrajectoryConfig;
-import com.litehed.ftclib.trajectory.TrajectoryGenerator;
 import javafx.animation.*;
 import javafx.beans.binding.Bindings;
 import javafx.beans.property.DoubleProperty;
@@ -29,7 +26,6 @@ import javafx.scene.text.FontWeight;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.util.Duration;
-import org.controlsfx.control.Notifications;
 import org.controlsfx.glyphfont.Glyph;
 
 import java.io.*;
@@ -45,8 +41,6 @@ public class VisualizerController {
     @FXML
     HBox btnBox;
     @FXML
-    Button addTrajBtn;
-    @FXML
     StackPane fieldPane;
     @FXML
     Label coords;
@@ -55,17 +49,10 @@ public class VisualizerController {
 
     private final DoubleProperty robotWidth = new SimpleDoubleProperty(60.0);
     private final DoubleProperty robotHeight = new SimpleDoubleProperty(60.0);
-    private final DoubleProperty startX = new SimpleDoubleProperty();
-    private final DoubleProperty startY = new SimpleDoubleProperty();
-    private final DoubleProperty startH = new SimpleDoubleProperty();
-    private DoubleProperty endX = new SimpleDoubleProperty(), endY = new SimpleDoubleProperty(), endH = new SimpleDoubleProperty();
-    private DoubleProperty maxVel = new SimpleDoubleProperty(1.5), maxAccel = new SimpleDoubleProperty(1.5);
-    private final ArrayList<Translation2d> interiorWaypoints = new ArrayList<>();
-    private final Accordion trajEditor = new Accordion();
     private final PathTransition pathTransition;
     private SequentialTransition rotateTransition;
     private SequentialTransition rotateList;
-    private final VBox constr, startPos, intWP, endPos, robotBox;
+    private final VBox robotBox;
     private final Rectangle endRect, startRect;
     private final Button playBtn;
     private PlayerBtn playType = PlayerBtn.PLAY;
@@ -73,16 +60,16 @@ public class VisualizerController {
     private final ProgressBar progressBar;
     private final DoubleProperty time = new SimpleDoubleProperty(0.0);
     private final Label timeLabel = new Label();
-    private Button wayPointBtn;
     private FileChooser fileChooser;
     private FileChooser exportChooser;
-    private boolean isTrajCreated = false;
     private ArrayList<Translation2d> tempPoints = new ArrayList<>();
-    private CheckBox reversed;
+    private TrajectoryManager trajectoryManager;
 
     public VisualizerController() {
         initializeFileChoosers();
-        
+
+        trajectoryManager = new TrajectoryManager(new TrajectoryPane(0));
+
         // Create start and end path indicators
         endRect = new Rectangle(robotHeight.get(), robotWidth.get());
         startRect = new Rectangle(robotHeight.get(), robotWidth.get());
@@ -92,16 +79,11 @@ public class VisualizerController {
         startRect.heightProperty().bind(robotWidth);
         endRect.setOpacity(0.3);
         startRect.setOpacity(0.3);
-        
-        // Create the waypoint and play buttons
-        wayPointBtn = new Button("Add Waypoint");
-        wayPointBtn.setOnMouseClicked(mouseEvent -> addWaypoint(0.0, 0.0));
 
-        playBtn = new Button("", new Glyph("FontAwesome", "PLAY"));
-
-        // Initialize teh transitions to visualize robot movement
+        // Initialize the transitions to visualize robot movement
         pathTransition = new PathTransition();
         rotateList = new SequentialTransition();
+        playBtn = new Button("", new Glyph("FontAwesome", "PLAY"));
         playBtn.setOnMouseClicked(mouseEvent -> handlePlay());
 
         // Create progress bar to control and view where along the path the robot is
@@ -114,93 +96,30 @@ public class VisualizerController {
         timeLabel.setTranslateY(5.0);
 
         progressBar.addEventHandler(MouseEvent.MOUSE_DRAGGED, event -> {
+            Trajectory trajectoryTest = trajectoryManager.getTrajectoryAt(0).getTrajectory();
             double newProgress = event.getX() / progressBar.getWidth();
-            Duration newDuration = Duration.seconds(newProgress * trajectory().getTotalTimeSeconds());
+            Duration newDuration = Duration.seconds(newProgress * trajectoryTest.getTotalTimeSeconds());
             time.set(newProgress);
             timeline.playFrom(newDuration);
-            if(playType == PlayerBtn.RESUME) timeline.pause();
+            if (playType == PlayerBtn.RESUME)
+                timeline.pause();
             pathTransition.playFrom(newDuration);
-            if(playType == PlayerBtn.RESUME) pathTransition.pause();
+            if (playType == PlayerBtn.RESUME)
+                pathTransition.pause();
             rotateTransition.playFrom(newDuration);
-            if(playType == PlayerBtn.RESUME) rotateTransition.pause();
-            if(playType == PlayerBtn.PLAY) {
+            if (playType == PlayerBtn.RESUME)
+                rotateTransition.pause();
+            if (playType == PlayerBtn.PLAY) {
                 playType = PlayerBtn.RESUME;
                 playBtn.setGraphic(new Glyph("FontAwesome", "PAUSE"));
             }
-            
-          });
-          
 
-        // Create the trajectory editor panel
-        trajEditor.getPanes().add(new TitledPane("Constraints", constr = new VBox(
-                new Label("Max Velocity m/s"), new NumberField("1.5"),
-                new Label("Max Acceleration m/s^2"), new NumberField("1.5"),
-                new Label("Reversed"), new CheckBox()
-        )));
-        trajEditor.getPanes().add(new TitledPane("Start Pose", startPos = new VBox(
-                new Label("Start X"), new NumberField(),
-                new Label("Start Y"), new NumberField(),
-                new Label("Start Heading"), new NumberField()
-        )));
-        ScrollPane wpScroll;
-        trajEditor.getPanes().add(new TitledPane("Interior Waypoints", wpScroll = new ScrollPane(
-                intWP = new VBox(
-                        wayPointBtn
-                )
-        )));
-        trajEditor.getPanes().add(new TitledPane("End Pose", endPos = new VBox(
-                new Label("End X"), new NumberField(),
-                new Label("End Y"), new NumberField(),
-                new Label("End Heading"), new NumberField()
-        )));
+        });
 
-        trajEditor.getPanes().add(new TitledPane("Robot", robotBox = new VBox(
+        // Robot Size Management
+        robotBox = new VBox(
                 new Label("Length (in)"), new NumberField("18.0"),
-                new Label("Width (in)"), new NumberField("18.0")
-        )));
-
-        for (int i = 1; i < startPos.getChildren().size(); i += 2) {
-            NumberField startField = (NumberField) startPos.getChildren().get(i);
-            NumberField endField = (NumberField) endPos.getChildren().get(i);
-
-            int finalI = i;
-            startField.textProperty().addListener((observable, oldValue, newValue) -> {
-                double amnt = Double.parseDouble(newValue);
-                if (finalI == 1)
-                    startX.set(ExtraMath.clampNumField(startField, amnt));
-                else if (finalI == 3)
-                    startY.set(ExtraMath.clampNumField(startField, amnt));
-                else if (finalI == 5)
-                    startH.set(amnt);
-
-                robot.setTranslateX(startRect.getTranslateX());
-                robot.setTranslateY(startRect.getTranslateY());
-                robot.setRotate(startRect.getRotate());
-
-                drawPath();
-            });
-
-            endField.textProperty().addListener((observable, oldValue, newValue) -> {
-                double amnt = Double.parseDouble(newValue);
-                if (finalI == 1) {
-                    endX.set(ExtraMath.clampNumField(endField, amnt));
-                } else if (finalI == 3) {
-                    endY.set(ExtraMath.clampNumField(endField, amnt));
-                } else if (finalI == 5) {
-                    endH.set(amnt);
-                }
-                drawPath();
-            });
-        }
-
-        // Bind conversions  
-        startRect.translateYProperty().bind(startX.multiply(-Constants.PIXELS_PER_METER));
-        startRect.translateXProperty().bind(startY.multiply(-Constants.PIXELS_PER_METER));
-        startRect.rotateProperty().bind(startH.multiply(-1.0));
-
-        endRect.translateYProperty().bind(endX.multiply(-Constants.PIXELS_PER_METER));
-        endRect.translateXProperty().bind(endY.multiply(-Constants.PIXELS_PER_METER));
-        endRect.rotateProperty().bind(endH.multiply(-1.0));
+                new Label("Width (in)"), new NumberField("18.0"));
 
         NumberField widthField = (NumberField) robotBox.getChildren().get(1);
         NumberField lengthField = (NumberField) robotBox.getChildren().get(3);
@@ -215,8 +134,6 @@ public class VisualizerController {
                 robotHeight.set(ExtraMath.robotConv(Double.parseDouble(newValue)));
         });
 
-        wpScroll.setFitToWidth(true);
-        manageConstraints();
     }
 
     private void initializeFileChoosers() {
@@ -224,51 +141,24 @@ public class VisualizerController {
         fileChooser.setInitialFileName("trajectory");
         fileChooser.getExtensionFilters().addAll(
                 new FileChooser.ExtensionFilter("poggers", "*.pog"));
-    
+
         exportChooser = new FileChooser();
         exportChooser.setInitialFileName("Trajectory");
         exportChooser.getExtensionFilters().addAll(
                 new FileChooser.ExtensionFilter("Java", "*.java"));
     }
 
-    public Trajectory trajectory() {
-        Pose2d start = new Pose2d(startX.get(), startY.get(), new Rotation2d(Math.toRadians(startH.get())));
-        Pose2d end = new Pose2d(endX.get(), endY.get(), new Rotation2d(Math.toRadians(endH.get())));
-
-        reversed = (CheckBox) constr.getChildren().get(5);
-
-        TrajectoryConfig config = new TrajectoryConfig(maxVel.get(), maxAccel.get());
-        config.setReversed(reversed.isSelected());
-
-        return TrajectoryGenerator.generateTrajectory(start, interiorWaypoints, end, config);
-    }
-
     @FXML
-    protected void onFieldClick() {
-        if (!isTrajCreated)
-            return;
-        System.out.println("Trajectory Time: " + trajectory().getTotalTimeSeconds());
-        System.out.println("Cur Time: " + timeline.getCurrentTime());
-        drawPath();
-        if (timeline.getStatus() == Animation.Status.STOPPED)
-            timeLabel.textProperty().bind(Bindings.format("%.2f Seconds", trajectory().getTotalTimeSeconds()));
-    }
+    public void initialize() {
+        Accordion actions = new Accordion();
+        TrajectoryPane trajectoryPane = new TrajectoryPane(0);
 
-    @FXML
-    protected void onFieldMouseHover(MouseEvent mouseEvent) {
-        DecimalFormat coordFormat = new DecimalFormat("#.0000");
-        coords.setText("Coords: (" +
-                coordFormat.format(ExtraMath.unitsToMeters(mouseEvent.getY() - background.getFitWidth() / 2.0)) + " , "
-                + coordFormat.format(ExtraMath.unitsToMeters(mouseEvent.getX() - background.getFitWidth() / 2.0)) + ")");
-    }
-
-    @FXML
-    protected void onTrajCreateClick() {
-        isTrajCreated = true;
-        trajBox.getChildren().add(trajEditor);
+        trajectoryPane.getWayPointBtn().setOnMouseClicked(mouseEvent -> addWaypoint(0.0, 0.0));
+        actions.getPanes().add(new TitledPane("Robot", robotBox));
+        actions.getPanes().add(trajectoryPane);
+        trajBox.getChildren().add(actions);
         fieldPane.getChildren().add(2, startRect);
         fieldPane.getChildren().add(1, endRect);
-        addTrajBtn.setVisible(false);
         btnBox.getChildren().add(playBtn);
         btnBox.getChildren().add(progressBar);
         btnBox.getChildren().add(timeLabel);
@@ -276,26 +166,114 @@ public class VisualizerController {
         robot.setPreserveRatio(false);
         robot.fitWidthProperty().bind(robotHeight);
         robot.fitHeightProperty().bind(robotWidth);
+        Button addAfterAction = new Button("Add Action");
+        addAfterAction.setOnMouseClicked(event -> {
+            TrajectoryPane tempPane = createTrajPane();
+            actions.getPanes().add(tempPane);
+            createPosListeners(tempPane);
+        });
+
+        createPosListeners(trajectoryPane);
+        trajectoryManager.setTrajectoryAt(0, trajectoryPane);
+        trajBox.getChildren().add(addAfterAction);
+
+        // Bind conversions
+        // DoubleProperty[] startPosArr = trajectoryManager.getTrajectoryAt(0).startX
+        startRect.translateYProperty()
+                .bind(trajectoryManager.getTrajectoryAt(0).startX.multiply(-Constants.PIXELS_PER_METER));
+        startRect.translateXProperty()
+                .bind(trajectoryManager.getTrajectoryAt(0).startY.multiply(-Constants.PIXELS_PER_METER));
+        startRect.rotateProperty().bind(trajectoryManager.getTrajectoryAt(0).startH.multiply(-1.0));
+
+        endRect.translateYProperty()
+                .bind(trajectoryManager.getTrajectoryAt(0).endX.multiply(-Constants.PIXELS_PER_METER));
+        endRect.translateXProperty()
+                .bind(trajectoryManager.getTrajectoryAt(0).endY.multiply(-Constants.PIXELS_PER_METER));
+        endRect.rotateProperty().bind(trajectoryManager.getTrajectoryAt(0).endH.multiply(-1.0));
     }
 
+    private void createPosListeners(TrajectoryPane trajectory) {
+
+        for (int i = 1; i < trajectory.getStartPos().getChildren().size(); i += 2) {
+            NumberField startField = (NumberField) trajectory.getStartPos().getChildren().get(i);
+            NumberField endField = (NumberField) trajectory.getEndPos().getChildren().get(i);
+
+            int finalI = i;
+            startField.textProperty().addListener((observable, oldValue, newValue) -> {
+                double amnt = Double.parseDouble(newValue);
+                if (finalI == 1)
+                    trajectory.startX.set(ExtraMath.clampNumField(startField, amnt));
+                else if (finalI == 3)
+                    trajectory.startY.set(ExtraMath.clampNumField(startField, amnt));
+                else if (finalI == 5)
+                    trajectory.startH.set(amnt);
+
+                robot.setTranslateX(startRect.getTranslateX());
+                robot.setTranslateY(startRect.getTranslateY());
+                robot.setRotate(startRect.getRotate());
+
+                drawPath();
+            });
+
+            endField.textProperty().addListener((observable, oldValue, newValue) -> {
+                double amnt = Double.parseDouble(newValue);
+                if (finalI == 1) {
+                    trajectory.endX.set(ExtraMath.clampNumField(endField, amnt));
+                } else if (finalI == 3) {
+                    trajectory.endY.set(ExtraMath.clampNumField(endField, amnt));
+                } else if (finalI == 5) {
+                    trajectory.endH.set(amnt);
+                }
+                drawPath();
+            });
+        }
+
+        trajectory.getConstr().getChildren().get(5).setOnMouseClicked(event -> drawPath());
+    }
+
+    public TrajectoryPane createTrajPane() {
+        int trajID = trajectoryManager.getTrajAmount();
+        TrajectoryPane trajPane = new TrajectoryPane(trajID);
+        trajectoryManager.addTrajectory(trajPane);
+        return trajPane;
+    }
+
+    @FXML
+    protected void onFieldClick() {
+        Trajectory trajectoryTest = trajectoryManager.getTrajectoryAt(0).getTrajectory();
+        System.out.println("Trajectory Time: " + trajectoryTest.getTotalTimeSeconds());
+        System.out.println("Cur Time: " + timeline.getCurrentTime());
+        drawPath();
+        if (timeline.getStatus() == Animation.Status.STOPPED)
+            timeLabel.textProperty().bind(Bindings.format("%.2f Seconds", trajectoryTest.getTotalTimeSeconds()));
+    }
+
+    @FXML
+    protected void onFieldMouseHover(MouseEvent mouseEvent) {
+        DecimalFormat coordFormat = new DecimalFormat("#.0000");
+        coords.setText("Coords: (" +
+                coordFormat.format(ExtraMath.unitsToMeters(mouseEvent.getY() - background.getFitWidth() / 2.0)) + " , "
+                + coordFormat.format(ExtraMath.unitsToMeters(mouseEvent.getX() - background.getFitWidth() / 2.0))
+                + ")");
+    }
 
     @FXML
     protected void onSaveClick() throws IOException {
-        if (!isTrajCreated) {
-            Notifications.create()
-                    .title("Save Error")
-                    .text("Why would you save nothing?")
-                    .hideAfter(Duration.seconds(5))
-                    .show();
-            return;
-        }
+        DoubleProperty[] constraints = trajectoryManager.getTrajectoryAt(0).getConstraintsArray();
+        DoubleProperty[] startPosArr = trajectoryManager.getTrajectoryAt(0).getStartPosArray();
+        DoubleProperty[] endPosArr = trajectoryManager.getTrajectoryAt(0).getEndPosArray();
+        ArrayList<Translation2d> interiorWaypoints = trajectoryManager.getTrajectoryAt(0).getInteriorWaypoints();
+
+        VBox constr = trajectoryManager.getTrajectoryAt(0).getConstr();
         File saveFile = fileChooser.showSaveDialog(canvas.getScene().getWindow());
         BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(saveFile));
         SaveManager saveManager = new SaveManager(saveFile);
         saveManager.writeMode(bufferedWriter);
-        saveManager.writeDoubles(maxVel, maxAccel, robotHeight.divide(10.0 / 3.0), robotWidth.divide(10.0 / 3.0));
+        saveManager.writeDoubles(constraints[0], constraints[1], robotHeight.divide(10.0 / 3.0),
+                robotWidth.divide(10.0 / 3.0));
         saveManager.writeBools(((CheckBox) constr.getChildren().get(5)).isSelected());
-        saveManager.writeDoubles(startX, startY, startH, endX, endY, endH);
+        saveManager.writeDoubles(startPosArr[0], startPosArr[1], startPosArr[2], endPosArr[0], endPosArr[1],
+                endPosArr[2]);
         saveManager.writeWaypoints(interiorWaypoints);
         bufferedWriter.flush();
         bufferedWriter.close();
@@ -303,14 +281,12 @@ public class VisualizerController {
 
     @FXML
     protected void onLoadClick() throws IOException {
-        if (!isTrajCreated) {
-            Notifications.create()
-                    .title("Load Error")
-                    .text("Please click Create Trajectory before loading a new one :)")
-                    .hideAfter(Duration.seconds(5))
-                    .show();
-            return;
-        }
+        VBox constr = trajectoryManager.getTrajectoryAt(0).getConstr();
+        VBox intWP = trajectoryManager.getTrajectoryAt(0).getIntWP();
+        VBox startPos = trajectoryManager.getTrajectoryAt(0).getStartPos();
+        VBox endPos = trajectoryManager.getTrajectoryAt(0).getEndPos();
+        Button wayPointBtn = trajectoryManager.getTrajectoryAt(0).getWayPointBtn();
+
         File loadFile = fileChooser.showOpenDialog(canvas.getScene().getWindow());
         FileReader fileReader = new FileReader(loadFile);
         SaveManager saveManager = new SaveManager(loadFile);
@@ -325,7 +301,7 @@ public class VisualizerController {
                 (NumberField) endPos.getChildren().get(5));
 
         intWP.getChildren().clear();
-        interiorWaypoints.clear();
+        trajectoryManager.getTrajectoryAt(0).clearWaypoints();
         intWP.getChildren().add(wayPointBtn);
         if (tempPoints.size() > 0)
             fieldPane.getChildren().remove(1, tempPoints.size() + 1);
@@ -350,29 +326,40 @@ public class VisualizerController {
 
     @FXML
     protected void javaExportClick() throws IOException {
-        if (!isTrajCreated) {
-            Notifications.create()
-                    .title("Export Error")
-                    .text("What are you even exporting?")
-                    .hideAfter(Duration.seconds(5))
-                    .show();
-            return;
-        }
+        DoubleProperty[] constraints = trajectoryManager.getTrajectoryAt(0).getConstraintsArray();
+        DoubleProperty[] startPosArr = trajectoryManager.getTrajectoryAt(0).getStartPosArray();
+        DoubleProperty[] endPosArr = trajectoryManager.getTrajectoryAt(0).getEndPosArray();
+        ArrayList<Translation2d> interiorWaypoints = trajectoryManager.getTrajectoryAt(0).getInteriorWaypoints();
+
+        // if (!isInitialized) {
+        // Notifications.create()
+        // .title("Export Error")
+        // .text("What are you even exporting?")
+        // .hideAfter(Duration.seconds(5))
+        // .show();
+        // return;
+        // }
         File saveFile = exportChooser.showSaveDialog(canvas.getScene().getWindow());
         FileWriter fileWriter = new FileWriter(saveFile);
         BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
         bufferedWriter.write("public class " + saveFile.getName().replaceAll(".java", "") + " {\n");
         bufferedWriter.write("    public static Trajectory trajectory() {\n" +
-                "        Pose2d start = new Pose2d(" + startX.get() + ", " + startY.get() + ", new Rotation2d(Math.toRadians(" + startH.get() + ")));\n" +
-                "        Pose2d end = new Pose2d(" + endX.get() + ", " + endY.get() + ", new Rotation2d(Math.toRadians(" + endH.get() + ")));\n" +
+                "        Pose2d start = new Pose2d(" + startPosArr[0].get() + ", " + startPosArr[1].get()
+                + ", new Rotation2d(Math.toRadians(" + startPosArr[2].get() + ")));\n" +
+                "        Pose2d end = new Pose2d(" + endPosArr[0].get() + ", " + endPosArr[1].get()
+                + ", new Rotation2d(Math.toRadians("
+                + endPosArr[2].get() + ")));\n" +
                 "\n" +
                 "        ArrayList<Translation2d> interiorWaypoints = new ArrayList<>();\n");
         for (Translation2d translation2d : interiorWaypoints) {
-            bufferedWriter.write("        interiorWaypoints.add(" + translation2d.getX() + ", " + translation2d.getY() + ");\n");
+            bufferedWriter.write(
+                    "        interiorWaypoints.add(" + translation2d.getX() + ", " + translation2d.getY() + ");\n");
         }
         bufferedWriter.write("\n" +
-                "        TrajectoryConfig config = new TrajectoryConfig(" + maxVel.get() + ", " + maxAccel.get() + ");\n" +
-                "        config.setReversed(" + reversed.isSelected() + ");\n" +
+                "        TrajectoryConfig config = new TrajectoryConfig(" + constraints[0].get() + ", "
+                + constraints[1].get()
+                + ");\n" +
+                "        config.setReversed(" + trajectoryManager.getTrajectoryAt(0).isReversed() + ");\n" +
                 "\n" +
                 "        return TrajectoryGenerator.generateTrajectory(start, interiorWaypoints, end, config);\n" +
                 "    }");
@@ -382,7 +369,10 @@ public class VisualizerController {
         bufferedWriter.close();
     }
 
-    private void addWaypoint(double xPos, double yPos) {
+    public void addWaypoint(double xPos, double yPos) {
+        ArrayList<Translation2d> interiorWaypoints = trajectoryManager.getTrajectoryAt(0).getInteriorWaypoints();
+        VBox intWP = trajectoryManager.getTrajectoryAt(0).getIntWP();
+
         Label wpNum = new Label("Waypoint " + (int) (intWP.getChildren().size() / 5.0 + 0.8));
         Button delBtn = new Button("", new Glyph("FontAwesome", "TRASH_ALT"));
         NumberField x = new NumberField("" + xPos);
@@ -406,8 +396,8 @@ public class VisualizerController {
         delBtn.setOnMouseClicked(mouseEvent -> {
             intWP.getChildren().remove(intWP.getChildren().indexOf(waypointBox), intWP.getChildren().indexOf(y) + 1);
             fieldPane.getChildren().remove(fieldPane.getChildren().indexOf(waypoint));
-//            interiorWaypoints.remove(interiorWaypoints.indexOf(waypoint.getWaypoint()));
-            interiorWaypoints.remove(waypoint.getWaypoint());
+            // interiorWaypoints.remove(interiorWaypoints.indexOf(waypoint.getWaypoint()));
+            trajectoryManager.getTrajectoryAt(0).removeWaypoint(waypoint.getWaypoint());
             int i = 0;
             for (Node hbox : intWP.getChildren()) {
                 if (hbox instanceof HBox) {
@@ -421,30 +411,19 @@ public class VisualizerController {
         drawPath();
     }
 
-    public void manageConstraints() {
-        ((NumberField) constr.getChildren().get(1)).textProperty().addListener((observable, oldValue, newValue) -> {
-            if (Double.parseDouble(newValue) < 0)
-                ((NumberField) constr.getChildren().get(1)).textProperty().set(oldValue);
-            maxVel.set(Double.parseDouble(newValue));
-        });
-        ((NumberField) constr.getChildren().get(3)).textProperty().addListener((observable, oldValue, newValue) -> {
-            if (Double.parseDouble(newValue) < 0)
-                ((NumberField) constr.getChildren().get(3)).textProperty().set(oldValue);
-            maxAccel.set(Double.parseDouble(newValue));
-        });
-
-    }
-
     public Polyline drawPath() {
+
+        Trajectory trajectoryTest = trajectoryManager.getTrajectoryAt(0).getTrajectory();
+
         canvas.getGraphicsContext2D().clearRect(0, 0, canvas.getWidth(), canvas.getHeight());
 
         int index = 0;
-        double[] xArr = new double[(int) (trajectory().getTotalTimeSeconds() / 0.05)];
-        double[] yArr = new double[(int) (trajectory().getTotalTimeSeconds() / 0.05)];
+        double[] xArr = new double[(int) (trajectoryTest.getTotalTimeSeconds() / 0.05)];
+        double[] yArr = new double[(int) (trajectoryTest.getTotalTimeSeconds() / 0.05)];
         ArrayList<Double> xyArr = new ArrayList<>();
-        for (double sample = 0.05; sample < trajectory().getTotalTimeSeconds(); sample += 0.05) {
-            xArr[index] = ExtraMath.metersToUnits(trajectory().sample(sample).poseMeters.getY()) + 225;
-            yArr[index] = ExtraMath.metersToUnits(trajectory().sample(sample).poseMeters.getX()) + 225;
+        for (double sample = 0.05; sample < trajectoryTest.getTotalTimeSeconds(); sample += 0.05) {
+            xArr[index] = ExtraMath.metersToUnits(trajectoryTest.sample(sample).poseMeters.getY()) + 225;
+            yArr[index] = ExtraMath.metersToUnits(trajectoryTest.sample(sample).poseMeters.getX()) + 225;
             xyArr.add(xArr[index] - 225 + robot.getFitWidth() / 2);
             xyArr.add(yArr[index] - 225 + robot.getFitWidth() / 2);
             index++;
@@ -460,35 +439,39 @@ public class VisualizerController {
     }
 
     public SequentialTransition createRotationList() {
+        Trajectory trajectoryTest = trajectoryManager.getTrajectoryAt(0).getTrajectory();
+
         rotateList = new SequentialTransition();
-        for (double sample = 0.01; sample < trajectory().getTotalTimeSeconds(); sample += 0.01) {
+        for (double sample = 0.01; sample < trajectoryTest.getTotalTimeSeconds(); sample += 0.01) {
             RotateTransition tempTrans = new RotateTransition();
             tempTrans.setNode(robot);
             tempTrans.setDuration(Duration.seconds(0.01));
-            tempTrans.setToAngle(-Math.toDegrees(trajectory().sample(sample).poseMeters.getHeading()));
+            tempTrans.setToAngle(-Math.toDegrees(trajectoryTest.sample(sample).poseMeters.getHeading()));
             rotateList.getChildren().add(tempTrans);
         }
         return rotateList;
     }
 
     public void handlePlay() {
+        Trajectory trajectoryTest = trajectoryManager.getTrajectoryAt(0).getTrajectory();
+
         switch (playType) {
             case PLAY: {
                 if (timeline != null)
                     timeline.stop();
-                if (trajectory().getTotalTimeSeconds() < 0.1)
+                if (trajectoryTest.getTotalTimeSeconds() < 0.1)
                     break;
-                timeLabel.textProperty().bind(Bindings.format("%.2f Seconds", time.multiply(trajectory().getTotalTimeSeconds())));
+                timeLabel.textProperty()
+                        .bind(Bindings.format("%.2f Seconds", time.multiply(trajectoryTest.getTotalTimeSeconds())));
                 time.set(0.0);
                 timeline = new Timeline();
                 timeline.getKeyFrames().add(
-                        new KeyFrame(Duration.seconds(trajectory().getTotalTimeSeconds()),
-                                new KeyValue(time, 1)
-                        ));
+                        new KeyFrame(Duration.seconds(trajectoryTest.getTotalTimeSeconds()),
+                                new KeyValue(time, 1)));
                 timeline.playFromStart();
 
                 pathTransition.setNode(robot);
-                pathTransition.setDuration(Duration.seconds(trajectory().getTotalTimeSeconds()));
+                pathTransition.setDuration(Duration.seconds(trajectoryTest.getTotalTimeSeconds()));
                 pathTransition.setPath(drawPath());
                 rotateTransition = createRotationList();
                 pathTransition.play();
